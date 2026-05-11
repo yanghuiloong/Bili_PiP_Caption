@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Toolbar: appears on mouse hover -->
+  <div id="toolbar">
+    <div id="toolbar-inner">
+      <div id="drag-handle" title="拖拽移动">⠿ 移动</div>
+      <div class="sep"></div>
+      <div class="group">
+        <span class="lbl">字号</span>
+        <button id="sz-dec" class="tb">A−</button>
+        <span id="sz-val">32</span>
+        <button id="sz-inc" class="tb">A+</button>
+      </div>
+      <div class="sep"></div>
+      <div class="group">
+        <span class="lbl">颜色</span>
+        <div id="swatches">
+          <i class="sw on" data-c="#ffffff" style="background:#fff"></i>
+          <i class="sw" data-c="#ffeb3b" style="background:#ffeb3b"></i>
+          <i class="sw" data-c="#00e5ff" style="background:#00e5ff"></i>
+          <i class="sw" data-c="#69f0ae" style="background:#69f0ae"></i>
+          <i class="sw" data-c="#ff80ab" style="background:#ff80ab"></i>
+          <i class="sw" data-c="#ffab40" style="background:#ffab40"></i>
+        </div>
+        <input type="color" id="cpick" value="#ffffff" title="自定义颜色">
+      </div>
+      <div class="sep"></div>
+      <button id="close-toolbar" class="tb" style="color:#ff5252;font-weight:bold" title="关闭菜单">✖</button>
+    </div>
+  </div>
+
+  <!-- Subtitle: entire area is draggable when toolbar is visible -->
+  <div id="sub-wrap">
+    <div id="sub"></div>
+  </div>
+
+  <script>
+    const sub = document.getElementById('sub');
+    const toolbar = document.getElementById('toolbar');
+    const subWrap = document.getElementById('sub-wrap');
+    const szVal = document.getElementById('sz-val');
+    const cpick = document.getElementById('cpick');
+
+    let fontSize = 32, fontColor = '#ffffff';
+    let hideTimer = null, showing = false;
+
+    // ── Subtitle ──
+    window.electronAPI.onSubtitleUpdate(({ text }) => {
+      if (!text || !text.trim()) {
+        sub.classList.remove('show');
+      } else {
+        sub.textContent = text;
+        sub.classList.add('show');
+      }
+    });
+
+    // ── Settings ──
+    window.electronAPI.onSettingsLoaded((s) => {
+      if (s.fontSize) { fontSize = s.fontSize; applySize(); }
+      if (s.fontColor) { fontColor = s.fontColor; applyColor(); }
+    });
+
+    // ── Interaction Logic (Right-click to show) ──
+    let toolbarActive = false;
+    let isDragging = false;
+    let startMouseX = 0, startMouseY = 0;
+
+    const dragHandle = document.getElementById('drag-handle');
+    
+    dragHandle.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      startMouseX = e.screenX;
+      startMouseY = e.screenY;
+      document.body.style.cursor = 'grabbing';
+      dragHandle.setPointerCapture(e.pointerId);
+    });
+
+    dragHandle.addEventListener('pointermove', (e) => {
+      if (isDragging) {
+        const dx = e.screenX - startMouseX;
+        const dy = e.screenY - startMouseY;
+        startMouseX = e.screenX;
+        startMouseY = e.screenY;
+        if (dx !== 0 || dy !== 0) {
+          window.electronAPI.moveWindow(dx, dy);
+        }
+      }
+    });
+
+    dragHandle.addEventListener('pointerup', (e) => {
+      if (isDragging) {
+        isDragging = false;
+        document.body.style.cursor = 'default';
+        dragHandle.releasePointerCapture(e.pointerId);
+        window.electronAPI.saveSettings({}); 
+      }
+    });
+
+    // Right-click to show toolbar
+    document.addEventListener('contextmenu', (e) => {
+      if (e.target.id === 'sub' || e.target.closest('#sub-wrap')) {
+        e.preventDefault();
+        toolbarActive = true;
+        toolbar.classList.add('show');
+        window.electronAPI.setIgnoreMouse(false);
+      }
+    });
+
+    // Explicit close button
+    document.getElementById('close-toolbar').addEventListener('click', () => {
+      toolbarActive = false;
+      toolbar.classList.remove('show');
+      window.electronAPI.setIgnoreMouse(true);
+    });
+
+    // Dynamically toggle click-through based on what we are hovering
+    window.addEventListener('mousemove', (e) => {
+      if (isDragging) return;
+
+      const isOverText = e.target.id === 'sub';
+      const isOverToolbar = toolbar.contains(e.target);
+
+      if (isOverText || (toolbarActive && isOverToolbar)) {
+        window.electronAPI.setIgnoreMouse(false); // Make it clickable
+      } else {
+        window.electronAPI.setIgnoreMouse(true);  // Pass clicks through to browser
+      }
+    });
+
+    // ── Font size ──
+    function applySize() {
+      fontSize = Math.max(16, Math.min(72, fontSize));
+      sub.style.fontSize = fontSize + 'px';
+      szVal.textContent = fontSize;
+    }
+    document.getElementById('sz-dec').onclick = () => { fontSize -= 2; applySize(); window.electronAPI.saveSettings({ fontSize }); };
+    document.getElementById('sz-inc').onclick = () => { fontSize += 2; applySize(); window.electronAPI.saveSettings({ fontSize }); };
+
+    // ── Color ──
+    function applyColor() {
+      sub.style.color = fontColor;
+      cpick.value = fontColor;
+      document.querySelectorAll('.sw').forEach(s =>
+        s.classList.toggle('on', s.dataset.c.toLowerCase() === fontColor.toLowerCase())
+      );
+    }
+    document.querySelectorAll('.sw').forEach(s => {
+      s.onclick = () => { fontColor = s.dataset.c; applyColor(); window.electronAPI.saveSettings({ fontColor }); };
+    });
+    cpick.addEventListener('input', (e) => {
+      fontColor = e.target.value;
+      document.querySelectorAll('.sw').forEach(s => s.classList.remove('on'));
+      sub.style.color = fontColor;
+      window.electronAPI.saveSettings({ fontColor });
+    });
+  </script>
+</body>
+</html>

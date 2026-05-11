@@ -1,0 +1,15 @@
+{
+  "name": "bili-pip-overlay",
+  "version": "1.0.0",
+  "description": "Bili-PiP Caption 桌面透明字幕悬浮窗",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0"
+  }
+}

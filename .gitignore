@@ -1,0 +1,6 @@
+node_modules/
+overlay/node_modules/
+overlay/settings.json
+overlay/com.bili_pip_caption.json
+.DS_Store
+*.log
