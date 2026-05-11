@@ -24,8 +24,14 @@
           updateButtonState();
         }
         if (msg.type === 'overlay-visibility') {
+          const justOpened = !isOverlayVisible && msg.visible;
           isOverlayVisible = msg.visible;
           updateButtonState();
+          
+          if (justOpened) {
+            lastSubtitleText = null; // Force update to push current text immediately
+            onTimeUpdate();
+          }
         }
       });
       port.onDisconnect.addListener(() => {
