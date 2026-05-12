@@ -13,9 +13,14 @@
   let lastUrl = location.href;
   let port = null;
 
+  function isVideoPage() {
+    return location.href.includes('/video/') || location.href.includes('/bangumi/');
+  }
+
   // ─── Port connection to background ─────────────────────────────
   function ensurePort() {
     if (port) return;
+    if (!isVideoPage()) return;
     try {
       port = chrome.runtime.connect({ name: 'subtitle-stream' });
       port.onMessage.addListener((msg) => {
@@ -153,6 +158,7 @@
   }
 
   function injectControls() {
+    if (!isVideoPage()) return;
     if (document.getElementById('bili-pip-controls')) return;
     const toolbar = findToolbarContainer();
 
@@ -191,15 +197,27 @@
     lastSubtitleText = null;
     const old = document.getElementById('bili-pip-controls');
     if (old) old.remove();
-    sendToBackground({ type: 'subtitle-text', text: '' });
 
-    // If navigating away from a video/bangumi page, auto-close the overlay
-    if (!location.href.includes('/video/') && !location.href.includes('/bangumi/')) {
-      sendToBackground({ type: 'stop-overlay' });
+    if (!isVideoPage()) {
+      if (port) {
+        port.disconnect();
+        port = null;
+        isOverlayConnected = false;
+        isOverlayVisible = false;
+      }
+    } else {
+      sendToBackground({ type: 'subtitle-text', text: '' });
     }
   }
 
-  setInterval(() => { onNavigate(); setupVideoListener(); injectControls(); }, 1000);
+  setInterval(() => {
+    onNavigate();
+    if (isVideoPage()) {
+      ensurePort();
+      setupVideoListener();
+      injectControls();
+    }
+  }, 1000);
 
   // ─── Subtitle data from interceptor ────────────────────────────
   window.addEventListener('message', (event) => {
@@ -214,6 +232,8 @@
     }
   });
 
-  ensurePort();
-  setupVideoListener();
+  if (isVideoPage()) {
+    ensurePort();
+    setupVideoListener();
+  }
 })();
